@@ -35,7 +35,7 @@
 #include "ns3/boolean.h"
 #include "ns3/data-rate.h"
 #include "ns3/timer.h"
-#include "ns3/event-id.h" 
+#include "ns3/event-id.h"
 #include "ns3/random-variable-stream.h"
 
 namespace ns3 {
@@ -77,19 +77,27 @@ public:
     uint32_t packetsDequeued;
   } Stats;
 
+  enum QueueMode
+  {
+    QUEUE_MODE_PACKETS,     /**< Use number of packets for maximum queue size */
+    QUEUE_MODE_BYTES,       /**< Use number of bytes for maximum queue size */
+  };
+
   /**
    * \brief Set the operating mode of this queue.
    *
    * \param mode The operating mode of this queue.
    */
-  void SetMode (Queue::QueueMode mode);
+  void SetMode (QueueMode mode);
 
   /**
    * \brief Get the encapsulation mode of this queue.
    *
    * \returns The encapsulation mode of this queue.
    */
-  Queue::QueueMode GetMode (void);
+  QueueMode GetMode (void);
+
+
 
   /**
    * \brief Get the current value of the queue in bytes or packets.
@@ -157,7 +165,7 @@ private:
   Stats m_stats;                                //!< PI statistics
 
   // ** Variables supplied by user
-  Queue::QueueMode m_mode;                      //!< Mode (bytes or packets)
+  QueueMode m_mode;                      //!< Mode (bytes or packets)
   double m_queueLimit;                          //!< Queue limit in bytes / packets
   uint32_t m_meanPktSize;                       //!< Average packet size in bytes
   double m_qRef;                                //!< Desired queue size

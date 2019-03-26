@@ -48,10 +48,10 @@ TypeId PiQueueDisc::GetTypeId (void)
     .AddConstructor<PiQueueDisc> ()
     .AddAttribute ("Mode",
                    "Determines unit for QueueLimit",
-                   EnumValue (Queue::QUEUE_MODE_PACKETS),
+                   EnumValue (QUEUE_MODE_PACKETS),
                    MakeEnumAccessor (&PiQueueDisc::SetMode),
-                   MakeEnumChecker (Queue::QUEUE_MODE_BYTES, "QUEUE_MODE_BYTES",
-                                    Queue::QUEUE_MODE_PACKETS, "QUEUE_MODE_PACKETS"))
+                   MakeEnumChecker (QUEUE_MODE_BYTES, "QUEUE_MODE_BYTES",
+                                    QUEUE_MODE_PACKETS, "QUEUE_MODE_PACKETS"))
     .AddAttribute ("MeanPktSize",
                    "Average of packet size",
                    UintegerValue (500),
@@ -110,18 +110,19 @@ PiQueueDisc::DoDispose (void)
 }
 
 void
-PiQueueDisc::SetMode (Queue::QueueMode mode)
+PiQueueDisc::SetMode (QueueMode mode)
 {
   NS_LOG_FUNCTION (this << mode);
   m_mode = mode;
 }
 
-Queue::QueueMode
+PiQueueDisc::QueueMode
 PiQueueDisc::GetMode (void)
 {
   NS_LOG_FUNCTION (this);
   return m_mode;
 }
+
 
 void
 PiQueueDisc::SetQueueLimit (double lim)
@@ -134,11 +135,11 @@ uint32_t
 PiQueueDisc::GetQueueSize (void)
 {
   NS_LOG_FUNCTION (this);
-  if (GetMode () == Queue::QUEUE_MODE_BYTES)
+  if (GetMode () == QUEUE_MODE_BYTES)
     {
       return GetInternalQueue (0)->GetNBytes ();
     }
-  else if (GetMode () == Queue::QUEUE_MODE_PACKETS)
+  else if (GetMode () == QUEUE_MODE_PACKETS)
     {
       return GetInternalQueue (0)->GetNPackets ();
     }
@@ -170,18 +171,18 @@ PiQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 
   uint32_t nQueued = GetQueueSize ();
 
-  if ((GetMode () == Queue::QUEUE_MODE_PACKETS && nQueued >= m_queueLimit)
-      || (GetMode () == Queue::QUEUE_MODE_BYTES && nQueued + item->GetPacketSize () > m_queueLimit))
+  if ((GetMode () == QUEUE_MODE_PACKETS && nQueued >= m_queueLimit)
+      || (GetMode () == QUEUE_MODE_BYTES && nQueued + item->GetSize () > m_queueLimit))
     {
       // Drops due to queue limit: reactive
-      Drop (item);
+      DropAfterDequeue (item,"Hello");
       m_stats.forcedDrop++;
       return false;
     }
   else if (DropEarly (item, nQueued))
     {
       // Early probability drop: proactive
-      Drop (item);
+      DropBeforeEnqueue (item,"Hello");
       m_stats.unforcedDrop++;
       return false;
     }
@@ -214,9 +215,9 @@ bool PiQueueDisc::DropEarly (Ptr<QueueDiscItem> item, uint32_t qSize)
   double p = m_dropProb;
   bool earlyDrop = true;
   
-  if (GetMode () == Queue::QUEUE_MODE_BYTES)
+  if (GetMode () == QUEUE_MODE_BYTES)
     {
-       p = p * item->GetPacketSize () / m_meanPktSize;
+       p = p * item->GetSize () / m_meanPktSize;
     }
   p = p > 1 ? 1 : p;
 
@@ -239,7 +240,7 @@ void PiQueueDisc::CalculateP ()
   NS_LOG_FUNCTION (this);
   double p = 0.0;
   uint32_t qlen = GetQueueSize ();
-  if (GetMode () == Queue::QUEUE_MODE_BYTES)
+  if (GetMode () == QUEUE_MODE_BYTES)
     {
       p = m_a * ((qlen * 1.0 / m_meanPktSize) - m_qRef) - m_b * ((m_qOld * 1.0 / m_meanPktSize) - m_qRef) + m_dropProb;
     }
@@ -307,16 +308,8 @@ PiQueueDisc::CheckConfig (void)
   if (GetNInternalQueues () == 0)
     {
       // create a DropTail queue
-      Ptr<Queue> queue = CreateObjectWithAttributes<DropTailQueue> ("Mode", EnumValue (m_mode));
-      if (m_mode == Queue::QUEUE_MODE_PACKETS)
-        {
-          queue->SetMaxPackets (m_queueLimit);
-        }
-      else
-        {
-          queue->SetMaxBytes (m_queueLimit);
-        }
-      AddInternalQueue (queue);
+      AddInternalQueue (CreateObjectWithAttributes<DropTailQueue<QueueDiscItem> >
+                          ("MaxSize", QueueSizeValue (GetMaxSize ())));
     }
 
   if (GetNInternalQueues () != 1)
@@ -324,21 +317,10 @@ PiQueueDisc::CheckConfig (void)
       NS_LOG_ERROR ("PiQueueDisc needs 1 internal queue");
       return false;
     }
-
-  if (GetInternalQueue (0)->GetMode () != m_mode)
-    {
-      NS_LOG_ERROR ("The mode of the provided queue does not match the mode set on the PiQueueDisc");
-      return false;
-    }
-
-  if ((m_mode ==  Queue::QUEUE_MODE_PACKETS && GetInternalQueue (0)->GetMaxPackets () < m_queueLimit)
-      || (m_mode ==  Queue::QUEUE_MODE_BYTES && GetInternalQueue (0)->GetMaxBytes () < m_queueLimit))
-    {
-      NS_LOG_ERROR ("The size of the internal queue is less than the queue disc limit");
-      return false;
-    }
+ 
 
   return true;
 }
 
-} //namespace ns3
+}
+ //namespace ns3
