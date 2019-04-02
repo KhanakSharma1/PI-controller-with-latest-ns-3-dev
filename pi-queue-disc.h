@@ -67,58 +67,7 @@ public:
    */
   virtual ~PiQueueDisc ();
 
-  /**
-   * \brief Stats
-   */
-  typedef struct
-  {
-    uint32_t unforcedDrop;      //!< Early probability drops: proactive
-    uint32_t forcedDrop;        //!< Drops due to queue limit: reactive
-    uint32_t packetsDequeued;
-  } Stats;
-
-  enum QueueMode
-  {
-    QUEUE_MODE_PACKETS,     /**< Use number of packets for maximum queue size */
-    QUEUE_MODE_BYTES,       /**< Use number of bytes for maximum queue size */
-  };
-
-  /**
-   * \brief Set the operating mode of this queue.
-   *
-   * \param mode The operating mode of this queue.
-   */
-  void SetMode (QueueMode mode);
-
-  /**
-   * \brief Get the encapsulation mode of this queue.
-   *
-   * \returns The encapsulation mode of this queue.
-   */
-  QueueMode GetMode (void);
-
-
-
-  /**
-   * \brief Get the current value of the queue in bytes or packets.
-   *
-   * \returns The queue size in bytes or packets.
-   */
-  uint32_t GetQueueSize (void);
-
-  /**
-   * \brief Set the limit of the queue in bytes or packets.
-   *
-   * \param lim The limit in bytes or packets.
-   */
-  void SetQueueLimit (double lim);
-
-  /**
-   * \brief Get PI statistics after running.
-   *
-   * \returns The drop statistics.
-   */
-  Stats GetStats ();
+  
 
   /**
    * Assign a fixed random variable stream number to the random variables
@@ -129,6 +78,8 @@ public:
    * \return the number of stream indices assigned by this model
    */
   int64_t AssignStreams (int64_t stream);
+  static constexpr const char* UNFORCED_DROP = "Unforced drop";  //!< Early probability drops
+  static constexpr const char* FORCED_DROP = "Forced drop";
 
 protected:
   /**
@@ -162,11 +113,11 @@ private:
    */
   void CalculateP ();
 
-  Stats m_stats;                                //!< PI statistics
+  //Stats m_stats;                                //!< PI statistics
 
   // ** Variables supplied by user
-  QueueMode m_mode;                      //!< Mode (bytes or packets)
-  double m_queueLimit;                          //!< Queue limit in bytes / packets
+  //QueueSizeUnit m_mode;                      //!< Mode (bytes or packets)
+  //double m_queueLimit;                          //!< Queue limit in bytes / packets
   uint32_t m_meanPktSize;                       //!< Average packet size in bytes
   double m_qRef;                                //!< Desired queue size
   double m_a;                                   //!< Parameter to PI controller

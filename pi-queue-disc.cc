@@ -46,12 +46,6 @@ TypeId PiQueueDisc::GetTypeId (void)
     .SetParent<QueueDisc> ()
     .SetGroupName ("TrafficControl")
     .AddConstructor<PiQueueDisc> ()
-    .AddAttribute ("Mode",
-                   "Determines unit for QueueLimit",
-                   EnumValue (QUEUE_MODE_PACKETS),
-                   MakeEnumAccessor (&PiQueueDisc::SetMode),
-                   MakeEnumChecker (QUEUE_MODE_BYTES, "QUEUE_MODE_BYTES",
-                                    QUEUE_MODE_PACKETS, "QUEUE_MODE_PACKETS"))
     .AddAttribute ("MeanPktSize",
                    "Average of packet size",
                    UintegerValue (500),
@@ -77,18 +71,19 @@ TypeId PiQueueDisc::GetTypeId (void)
                    DoubleValue (170),
                    MakeDoubleAccessor (&PiQueueDisc::m_w),
                    MakeDoubleChecker<double> ())
-    .AddAttribute ("QueueLimit",
-                   "Queue limit in bytes/packets",
-                   DoubleValue (50),
-                   MakeDoubleAccessor (&PiQueueDisc::SetQueueLimit),
-                   MakeDoubleChecker<double> ())
+    .AddAttribute ("MaxSize",
+                   "The maximum number of packets accepted by this queue disc",
+                   QueueSizeValue (QueueSize ("25p")),
+                   MakeQueueSizeAccessor (&QueueDisc::SetMaxSize,
+                                          &QueueDisc::GetMaxSize),
+                   MakeQueueSizeChecker ())
   ;
 
   return tid;
 }
 
 PiQueueDisc::PiQueueDisc ()
-  : QueueDisc ()
+  : QueueDisc (QueueDiscSizePolicy::SINGLE_INTERNAL_QUEUE)
 {
   NS_LOG_FUNCTION (this);
   m_uv = CreateObject<UniformRandomVariable> ();
@@ -109,52 +104,35 @@ PiQueueDisc::DoDispose (void)
   QueueDisc::DoDispose ();
 }
 
-void
-PiQueueDisc::SetMode (QueueMode mode)
+/*void
+PiQueueDisc::SetMode (QueueSizeUnit mode)
 {
   NS_LOG_FUNCTION (this << mode);
   m_mode = mode;
 }
 
-PiQueueDisc::QueueMode
+QueueSizeUnit
 PiQueueDisc::GetMode (void)
 {
   NS_LOG_FUNCTION (this);
   return m_mode;
 }
 
-
 void
 PiQueueDisc::SetQueueLimit (double lim)
 {
   NS_LOG_FUNCTION (this << lim);
   m_queueLimit = lim;
-}
+}*/
 
-uint32_t
-PiQueueDisc::GetQueueSize (void)
-{
-  NS_LOG_FUNCTION (this);
-  if (GetMode () == QUEUE_MODE_BYTES)
-    {
-      return GetInternalQueue (0)->GetNBytes ();
-    }
-  else if (GetMode () == QUEUE_MODE_PACKETS)
-    {
-      return GetInternalQueue (0)->GetNPackets ();
-    }
-  else
-    {
-      NS_ABORT_MSG ("Unknown PI mode.");
-    }
-}
 
-PiQueueDisc::Stats
+
+/*PiQueueDisc::Stats
 PiQueueDisc::GetStats ()
 {
   NS_LOG_FUNCTION (this);
   return m_stats;
-}
+}*/
 
 int64_t
 PiQueueDisc::AssignStreams (int64_t stream)
@@ -169,21 +147,20 @@ PiQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
   NS_LOG_FUNCTION (this << item);
 
-  uint32_t nQueued = GetQueueSize ();
+  QueueSize nQueued = GetCurrentSize ();
 
-  if ((GetMode () == QUEUE_MODE_PACKETS && nQueued >= m_queueLimit)
-      || (GetMode () == QUEUE_MODE_BYTES && nQueued + item->GetSize () > m_queueLimit))
+  if (nQueued + item > GetMaxSize ())
     {
       // Drops due to queue limit: reactive
-      DropAfterDequeue (item,"Hello");
-      m_stats.forcedDrop++;
+      DropBeforeEnqueue (item,FORCED_DROP);
+      
       return false;
     }
-  else if (DropEarly (item, nQueued))
+  else if (DropEarly (item, nQueued.GetValue()))
     {
       // Early probability drop: proactive
-      DropBeforeEnqueue (item,"Hello");
-      m_stats.unforcedDrop++;
+      DropBeforeEnqueue (item,UNFORCED_DROP);
+      
       return false;
     }
 
@@ -203,8 +180,6 @@ void
 PiQueueDisc::InitializeParams (void)
 {
   m_dropProb = 0;
-  m_stats.forcedDrop = 0;
-  m_stats.unforcedDrop = 0;
   m_qOld = 0;
 }
 
@@ -215,7 +190,7 @@ bool PiQueueDisc::DropEarly (Ptr<QueueDiscItem> item, uint32_t qSize)
   double p = m_dropProb;
   bool earlyDrop = true;
   
-  if (GetMode () == QUEUE_MODE_BYTES)
+  if (GetMaxSize ().GetUnit () == QueueSizeUnit::BYTES)
     {
        p = p * item->GetSize () / m_meanPktSize;
     }
@@ -239,8 +214,8 @@ void PiQueueDisc::CalculateP ()
 {
   NS_LOG_FUNCTION (this);
   double p = 0.0;
-  uint32_t qlen = GetQueueSize ();
-  if (GetMode () == QUEUE_MODE_BYTES)
+  uint32_t qlen = GetInternalQueue (0)->GetCurrentSize ().GetValue ();;
+  if (GetMaxSize ().GetUnit () == QueueSizeUnit::BYTES)
     {
       p = m_a * ((qlen * 1.0 / m_meanPktSize) - m_qRef) - m_b * ((m_qOld * 1.0 / m_meanPktSize) - m_qRef) + m_dropProb;
     }
@@ -307,7 +282,7 @@ PiQueueDisc::CheckConfig (void)
 
   if (GetNInternalQueues () == 0)
     {
-      // create a DropTail queue
+      // add a DropTail queue
       AddInternalQueue (CreateObjectWithAttributes<DropTailQueue<QueueDiscItem> >
                           ("MaxSize", QueueSizeValue (GetMaxSize ())));
     }
@@ -317,10 +292,11 @@ PiQueueDisc::CheckConfig (void)
       NS_LOG_ERROR ("PiQueueDisc needs 1 internal queue");
       return false;
     }
- 
+
+
+  
 
   return true;
 }
 
-}
- //namespace ns3
+} //namespace ns3

@@ -32,7 +32,7 @@ using namespace ns3;
 
 class PiQueueDiscTestItem : public QueueDiscItem {
 public:
-  PiQueueDiscTestItem (Ptr<Packet> p, const Address & addr);
+  PiQueueDiscTestItem (Ptr<Packet> p, const Address & addr, uint16_t protocol);
   virtual ~PiQueueDiscTestItem ();
   virtual void AddHeader (void);
   virtual bool Mark(void);
@@ -43,8 +43,8 @@ private:
   PiQueueDiscTestItem &operator = (const PiQueueDiscTestItem &);
 };
 
-PiQueueDiscTestItem::PiQueueDiscTestItem (Ptr<Packet> p, const Address & addr)
-  : QueueDiscItem (p, addr,0)
+PiQueueDiscTestItem::PiQueueDiscTestItem (Ptr<Packet> p, const Address & addr, uint16_t protocol)
+  : QueueDiscItem (p, addr, protocol)
 {
 }
 
@@ -59,9 +59,9 @@ PiQueueDiscTestItem::AddHeader (void)
 bool
 PiQueueDiscTestItem::Mark (void)
 {
+  
   return false;
 }
-
 class PiQueueDiscTestCase : public TestCase
 {
 public:
@@ -70,7 +70,7 @@ public:
 private:
   void Enqueue (Ptr<PiQueueDisc> queue, uint32_t size, uint32_t nPkt);
   void EnqueueWithDelay (Ptr<PiQueueDisc> queue, uint32_t size, uint32_t nPkt);
-  void RunPiTest (StringValue mode);
+  void RunPiTest (QueueSizeUnit mode);
 };
 
 PiQueueDiscTestCase::PiQueueDiscTestCase ()
@@ -79,7 +79,7 @@ PiQueueDiscTestCase::PiQueueDiscTestCase ()
 }
 
 void
-PiQueueDiscTestCase::RunPiTest (StringValue mode)
+PiQueueDiscTestCase::RunPiTest (QueueSizeUnit mode)
 {
   uint32_t pktSize = 0;
   // 1 for packets; pktSize for bytes
@@ -88,10 +88,9 @@ PiQueueDiscTestCase::RunPiTest (StringValue mode)
   Ptr<PiQueueDisc> queue = CreateObject<PiQueueDisc> ();
 
   // test 1: simple enqueue/dequeue with no drops
-  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("Mode", mode), true,
-                         "Verify that we can actually set the attribute Mode");
-  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("QueueLimit", DoubleValue (qSize)), true,
-                         "Verify that we can actually set the attribute QueueLimit");
+  
+  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("MaxSize", QueueSizeValue (QueueSize (mode, qSize))),
+                         true, "Verify that we can actually set the attribute MaxSize");
   NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("A", DoubleValue (0.125)), true,
                          "Verify that we can actually set the attribute A");
   NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("B", DoubleValue (1.25)), true,
@@ -105,11 +104,11 @@ PiQueueDiscTestCase::RunPiTest (StringValue mode)
 
   Address dest;
 
-  if (queue->GetMode () == PiQueueDisc::QUEUE_MODE_BYTES)
+  if (mode == QueueSizeUnit::BYTES)
     {
       pktSize = 500;
       modeSize = pktSize;
-      queue->SetQueueLimit (qSize * modeSize);
+      queue->SetMaxSize (QueueSize (mode, qSize * modeSize));
     }
 
   Ptr<Packet> p1, p2, p3, p4, p5, p6, p7, p8;
@@ -123,34 +122,34 @@ PiQueueDiscTestCase::RunPiTest (StringValue mode)
   p8 = Create<Packet> (pktSize);
 
   queue->Initialize ();
-  NS_TEST_EXPECT_MSG_EQ (queue->GetQueueSize (), 0 * modeSize, "There should be no packets in there");
-  queue->Enqueue (Create<PiQueueDiscTestItem> (p1, dest));
-  NS_TEST_EXPECT_MSG_EQ (queue->GetQueueSize (), 1 * modeSize, "There should be one packet in there");
-  queue->Enqueue (Create<PiQueueDiscTestItem> (p2, dest));
-  NS_TEST_EXPECT_MSG_EQ (queue->GetQueueSize (), 2 * modeSize, "There should be two packets in there");
-  queue->Enqueue (Create<PiQueueDiscTestItem> (p3, dest));
-  queue->Enqueue (Create<PiQueueDiscTestItem> (p4, dest));
-  queue->Enqueue (Create<PiQueueDiscTestItem> (p5, dest));
-  queue->Enqueue (Create<PiQueueDiscTestItem> (p6, dest));
-  queue->Enqueue (Create<PiQueueDiscTestItem> (p7, dest));
-  queue->Enqueue (Create<PiQueueDiscTestItem> (p8, dest));
-  NS_TEST_EXPECT_MSG_EQ (queue->GetQueueSize (), 8 * modeSize, "There should be eight packets in there");
+  NS_TEST_EXPECT_MSG_EQ (queue->GetCurrentSize ().GetValue (), 0 * modeSize, "There should be no packets in there");
+  queue->Enqueue (Create<PiQueueDiscTestItem> (p1, dest, false));
+  NS_TEST_EXPECT_MSG_EQ (queue->GetCurrentSize ().GetValue (), 1 * modeSize, "There should be one packet in there");
+  queue->Enqueue (Create<PiQueueDiscTestItem> (p2, dest, false));
+  NS_TEST_EXPECT_MSG_EQ (queue->GetCurrentSize ().GetValue (), 2 * modeSize, "There should be two packets in there");
+  queue->Enqueue (Create<PiQueueDiscTestItem> (p3, dest, false));
+  queue->Enqueue (Create<PiQueueDiscTestItem> (p4, dest, false));
+  queue->Enqueue (Create<PiQueueDiscTestItem> (p5, dest, false));
+  queue->Enqueue (Create<PiQueueDiscTestItem> (p6, dest, false));
+  queue->Enqueue (Create<PiQueueDiscTestItem> (p7, dest, false));
+  queue->Enqueue (Create<PiQueueDiscTestItem> (p8, dest, false));
+  NS_TEST_EXPECT_MSG_EQ (queue->GetCurrentSize ().GetValue (), 8 * modeSize, "There should be eight packets in there");
 
   Ptr<QueueDiscItem> item;
 
   item = queue->Dequeue ();
   NS_TEST_EXPECT_MSG_EQ ((item != 0), true, "I want to remove the first packet");
-  NS_TEST_EXPECT_MSG_EQ (queue->GetQueueSize (), 7 * modeSize, "There should be seven packets in there");
+  NS_TEST_EXPECT_MSG_EQ (queue->GetCurrentSize ().GetValue (), 7 * modeSize, "There should be seven packets in there");
   NS_TEST_EXPECT_MSG_EQ (item->GetPacket ()->GetUid (), p1->GetUid (), "was this the first packet ?");
 
   item = queue->Dequeue ();
   NS_TEST_EXPECT_MSG_EQ ((item != 0), true, "I want to remove the second packet");
-  NS_TEST_EXPECT_MSG_EQ (queue->GetQueueSize (), 6 * modeSize, "There should be six packet in there");
+  NS_TEST_EXPECT_MSG_EQ (queue->GetCurrentSize ().GetValue (), 6 * modeSize, "There should be six packet in there");
   NS_TEST_EXPECT_MSG_EQ (item->GetPacket ()->GetUid (), p2->GetUid (), "Was this the second packet ?");
 
   item = queue->Dequeue ();
   NS_TEST_EXPECT_MSG_EQ ((item != 0), true, "I want to remove the third packet");
-  NS_TEST_EXPECT_MSG_EQ (queue->GetQueueSize (), 5 * modeSize, "There should be five packets in there");
+  NS_TEST_EXPECT_MSG_EQ (queue->GetCurrentSize ().GetValue (), 5 * modeSize, "There should be five packets in there");
   NS_TEST_EXPECT_MSG_EQ (item->GetPacket ()->GetUid (), p3->GetUid (), "Was this the third packet ?");
 
   item = queue->Dequeue ();
@@ -171,44 +170,43 @@ PiQueueDiscTestCase::RunPiTest (StringValue mode)
   // test 2: default values for PI parameters
   queue = CreateObject<PiQueueDisc> ();
   qSize = 300 * modeSize;
-  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("Mode", mode), true,
-                         "Verify that we can actually set the attribute Mode");
+  
   NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("MeanPktSize", UintegerValue (pktSize)), true,
                          "Verify that we can actually set the attribute MeanPktSize");
   NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("QueueRef", DoubleValue (50)), true,
                          "Verify that we can actually set the attribute QueueRef");
-  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("QueueLimit", DoubleValue (qSize)), true,
-                         "Verify that we can actually set the attribute QueueLimit");
+  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("MaxSize", QueueSizeValue (QueueSize (mode, qSize))),
+                         true, "Verify that we can actually set the attribute MaxSize");
   NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("W", DoubleValue (170)), true,
                          "Verify that we can actually set the attribute W");
   queue->Initialize ();
   EnqueueWithDelay (queue, pktSize, 300);
   Simulator::Stop (Seconds (40));
   Simulator::Run ();
-  PiQueueDisc::Stats st = StaticCast<PiQueueDisc> (queue)->GetStats ();
-  drop.test2 = st.unforcedDrop;
+  //PiQueueDisc::Stats st = StaticCast<PiQueueDisc> (queue)->GetStats ();
+  QueueDisc::Stats st = queue->GetStats ();
+  drop.test2 = st.GetNDroppedPackets (PiQueueDisc::UNFORCED_DROP);
   NS_TEST_EXPECT_MSG_NE (drop.test2, 0, "There should be some unforced drops");
 
 
   // test 3: high value of W
   queue = CreateObject<PiQueueDisc> ();
   qSize = 300 * modeSize;
-  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("Mode", mode), true,
-                         "Verify that we can actually set the attribute Mode");
+  
   NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("MeanPktSize", UintegerValue (pktSize)), true,
                          "Verify that we can actually set the attribute MeanPktSize");
   NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("QueueRef", DoubleValue (50)), true,
                          "Verify that we can actually set the attribute QueueRef");
-  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("QueueLimit", DoubleValue (qSize)), true,
-                         "Verify that we can actually set the attribute QueueLimit");
+  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("MaxSize", QueueSizeValue (QueueSize (mode, qSize))),
+                         true, "Verify that we can actually set the attribute MaxSize");
   NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("W", DoubleValue (500)), true,
                          "Verify that we can actually set the attribute W");
   queue->Initialize ();
   EnqueueWithDelay (queue, pktSize, 300);
   Simulator::Stop (Seconds (40));
   Simulator::Run ();
-  st = StaticCast<PiQueueDisc> (queue)->GetStats ();
-  drop.test3 = st.unforcedDrop;
+  st = queue->GetStats ();
+  drop.test3 = st.GetNDroppedPackets (PiQueueDisc::UNFORCED_DROP);
   NS_TEST_EXPECT_MSG_GT (drop.test3, drop.test2, "Test 3 should have more unforced drops than Test 2");
 }
 
@@ -218,7 +216,7 @@ PiQueueDiscTestCase::Enqueue (Ptr<PiQueueDisc> queue, uint32_t size, uint32_t nP
   Address dest;
   for (uint32_t i = 0; i < nPkt; i++)
     {
-      queue->Enqueue (Create<PiQueueDiscTestItem> (Create<Packet> (size), dest));
+      queue->Enqueue (Create<PiQueueDiscTestItem> (Create<Packet> (size), dest, false));
     }
 }
 
@@ -237,8 +235,8 @@ PiQueueDiscTestCase::EnqueueWithDelay (Ptr<PiQueueDisc> queue, uint32_t size, ui
 void
 PiQueueDiscTestCase::DoRun (void)
 {
-  RunPiTest (StringValue ("QUEUE_MODE_PACKETS"));
-  RunPiTest (StringValue ("QUEUE_MODE_BYTES"));
+  RunPiTest (QueueSizeUnit::PACKETS);
+  RunPiTest (QueueSizeUnit::BYTES);
   Simulator::Destroy ();
 }
 
