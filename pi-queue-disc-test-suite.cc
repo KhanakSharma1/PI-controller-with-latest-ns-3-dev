@@ -106,7 +106,7 @@ PiQueueDiscTestCase::RunPiTest (QueueSizeUnit mode)
 
   if (mode == QueueSizeUnit::BYTES)
     {
-      pktSize = 500;
+      pktSize = 600;
       modeSize = pktSize;
       queue->SetMaxSize (QueueSize (mode, qSize * modeSize));
     }
@@ -199,7 +199,7 @@ PiQueueDiscTestCase::RunPiTest (QueueSizeUnit mode)
                          "Verify that we can actually set the attribute QueueRef");
   NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("MaxSize", QueueSizeValue (QueueSize (mode, qSize))),
                          true, "Verify that we can actually set the attribute MaxSize");
-  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("W", DoubleValue (500)), true,
+  NS_TEST_EXPECT_MSG_EQ (queue->SetAttributeFailSafe ("W", DoubleValue (600)), true,
                          "Verify that we can actually set the attribute W");
   queue->Initialize ();
   EnqueueWithDelay (queue, pktSize, 300);
