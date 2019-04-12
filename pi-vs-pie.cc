@@ -39,14 +39,14 @@ int main (int argc, char *argv[])
   uint32_t    maxPackets = 100;
   bool        modeBytes  = false;
   uint32_t    queueDiscLimitPackets = 1000;
-  //double      minTh = 5;
-  //double      maxTh = 15;
   uint32_t    pktSize = 512;
   std::string appDataRate = "10Mbps";
   std::string queueDiscType = "PI";
   uint16_t port = 5001;
   std::string bottleNeckLinkBw = "1Mbps";
   std::string bottleNeckLinkDelay = "50ms";
+  bool printPieStats = true;
+  bool printPiStats = true;
 
   CommandLine cmd;
   cmd.AddValue ("nLeaf",     "Number of left and right side leaf nodes", nLeaf);
@@ -56,9 +56,6 @@ int main (int argc, char *argv[])
   cmd.AddValue ("appPktSize", "Set OnOff App Packet Size", pktSize);
   cmd.AddValue ("appDataRate", "Set OnOff App DataRate", appDataRate);
   cmd.AddValue ("modeBytes", "Set Queue disc mode to Packets <false> or bytes <true>", modeBytes);
-
-  //cmd.AddValue ("redMinTh", "RED queue minimum threshold", minTh);
-  //cmd.AddValue ("redMaxTh", "RED queue maximum threshold", maxTh);
   cmd.Parse (argc,argv);
 
   if ((queueDiscType != "PI") && (queueDiscType != "PIE"))
@@ -85,35 +82,26 @@ int main (int argc, char *argv[])
                           QueueSizeValue (QueueSize (QueueSizeUnit::BYTES, queueDiscLimitPackets * pktSize)));
       Config::SetDefault ("ns3::PieQueueDisc::MaxSize",
                           QueueSizeValue (QueueSize (QueueSizeUnit::BYTES, queueDiscLimitPackets * pktSize)));
-      //minTh *= pktSize;
-      //maxTh *= pktSize;
     }
 
-  //Config::SetDefault ("ns3::RedQueueDisc::MinTh", DoubleValue (minTh));
-  //Config::SetDefault ("ns3::RedQueueDisc::MaxTh", DoubleValue (maxTh));
-  //Config::SetDefault ("ns3::PiQueueDisc::LinkBandwidth", StringValue (bottleNeckLinkBw));
-  //Config::SetDefault ("ns3::PdQueueDisc::LinkDelay", StringValue (bottleNeckLinkDelay));
-  //Config::SetDefault ("ns3::PiQueueDisc::MaxSize", StringValue ("25p"));
-  //Config::SetDefault ("ns3::PieQueueDisc::MaxSize", StringValue ("25p"));
-  
-  Config::SetDefault ("ns3::PiQueueDisc::MeanPktSize", UintegerValue (pktSize));
-  Config::SetDefault ("ns3::PiQueueDisc::QueueRef", DoubleValue (50));
-  Config::SetDefault ("ns3::PiQueueDisc::W", DoubleValue (170));
-  
-  Config::SetDefault ("ns3::PieQueueDisc::MeanPktSize", UintegerValue (pktSize));
-  Config::SetDefault ("ns3::PieQueueDisc::DequeueThreshold", UintegerValue (10000));
-  Config::SetDefault ("ns3::PieQueueDisc::QueueDelayReference", TimeValue (Seconds (0.02)));
-  Config::SetDefault ("ns3::PieQueueDisc::MaxBurstAllowance", TimeValue (Seconds (0.1)));
-  
-/*
-  if (queueDiscType == PIE")
+ 
+  if (queueDiscType == "PI")
     {
-      // Turn on PIE
-      Config::SetDefault ("ns3::RedQueueDisc::ARED", BooleanValue (true));
-      Config::SetDefault ("ns3::RedQueueDisc::LInterm", DoubleValue (10.0));
+      Config::SetDefault ("ns3::PiQueueDisc::MeanPktSize", UintegerValue (pktSize));
+      Config::SetDefault ("ns3::PiQueueDisc::QueueRef", DoubleValue (50));
+      Config::SetDefault ("ns3::PiQueueDisc::W", DoubleValue (170));
     }
-*/
   
+ 
+ else if (queueDiscType == "PIE")
+  {
+      Config::SetDefault ("ns3::PieQueueDisc::MeanPktSize", UintegerValue (pktSize));
+      Config::SetDefault ("ns3::PieQueueDisc::DequeueThreshold", UintegerValue (10000));
+      Config::SetDefault ("ns3::PieQueueDisc::QueueDelayReference", TimeValue (Seconds (0.02)));
+      Config::SetDefault ("ns3::PieQueueDisc::MaxBurstAllowance", TimeValue (Seconds (0.1)));
+   }  
+      
+      
  // Create the point-to-point link helpers
   PointToPointHelper bottleNeckLink;
   bottleNeckLink.SetDeviceAttribute  ("DataRate", StringValue (bottleNeckLinkBw));
@@ -138,14 +126,24 @@ int main (int argc, char *argv[])
       stack.Install (d.GetRight (i));
     }
 
-  stack.Install (d.GetLeft ());
-  stack.Install (d.GetRight ());
-  TrafficControlHelper tchBottleneck;
-  QueueDiscContainer queueDiscs;
-  tchBottleneck.SetRootQueueDisc ("ns3::RedQueueDisc");
-  tchBottleneck.Install (d.GetLeft ()->GetDevice (0));
-  queueDiscs = tchBottleneck.Install (d.GetRight ()->GetDevice (0));
-
+      
+      
+      stack.Install (d.GetLeft ());
+      stack.Install (d.GetRight ());
+      TrafficControlHelper tchBottleneck;
+      QueueDiscContainer queueDiscs;
+  
+      if (queueDiscType == "PI")
+      tchBottleneck.SetRootQueueDisc ("ns3::PiQueueDisc");
+  
+      
+      if (queueDiscType == "PIE")
+      tchBottleneck.SetRootQueueDisc ("ns3::PieQueueDisc");
+      
+      tchBottleneck.Install (d.GetLeft ()->GetDevice (0));
+      queueDiscs = tchBottleneck.Install (d.GetRight ()->GetDevice (0));
+    
+  
   // Assign IP Addresses
   d.AssignIpv4Addresses (Ipv4AddressHelper ("10.1.1.0", "255.255.255.0"),
                          Ipv4AddressHelper ("10.2.1.0", "255.255.255.0"),
@@ -179,22 +177,50 @@ int main (int argc, char *argv[])
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
   std::cout << "Running the simulation" << std::endl;
+  Simulator::Stop (Seconds (15.0));
   Simulator::Run ();
 
   QueueDisc::Stats st = queueDiscs.Get (0)->GetStats ();
+ 
+ 
+ if (queueDiscType == "PI")
+  { 
+    if (st.GetNDroppedPackets (PiQueueDisc::FORCED_DROP) != 0)
+     {
+       std::cout << "There should be no drops due to queue full." << std::endl;
+       exit (1);
+     }
 
-  if (st.GetNDroppedPackets (RedQueueDisc::UNFORCED_DROP) == 0)
-    {
-      std::cout << "There should be some unforced drops" << std::endl;
-      exit (1);
-    }
+    if (printPiStats)
+     {
+       std::cout << "*** PI stats from Node 2 queue ***" << std::endl;
+       std::cout << "\t " << st.GetNDroppedPackets (PiQueueDisc::UNFORCED_DROP)
+                 << " drops due to prob mark" << std::endl;
+       std::cout << "\t " << st.GetNDroppedPackets (PiQueueDisc::FORCED_DROP)
+                 << " drops due to queue limits" << std::endl;
+     }
 
-  if (st.GetNDroppedPackets (QueueDisc::INTERNAL_QUEUE_DROP) != 0)
-    {
-      std::cout << "There should be zero drops due to queue full" << std::endl;
-      exit (1);
-    }
+ }  
 
+ else if (queueDiscType == "PIE")
+  { 
+    if (st.GetNDroppedPackets (PieQueueDisc::FORCED_DROP) != 0)
+     {
+       std::cout << "There should be no drops due to queue full." << std::endl;
+       exit (1);
+     }
+
+    if (printPieStats)
+     {
+       std::cout << "*** PIE stats from Node 2 queue ***" << std::endl;
+       std::cout << "\t " << st.GetNDroppedPackets (PieQueueDisc::UNFORCED_DROP)
+                 << " drops due to prob mark" << std::endl;
+       std::cout << "\t " << st.GetNDroppedPackets (PieQueueDisc::FORCED_DROP)
+                 << " drops due to queue limits" << std::endl;
+     }
+
+ }  
+  
   std::cout << "*** Stats from the bottleneck queue disc ***" << std::endl;
   std::cout << st << std::endl;
   std::cout << "Destroying the simulation" << std::endl;
@@ -202,4 +228,3 @@ int main (int argc, char *argv[])
   Simulator::Destroy ();
   return 0;
 }
-
