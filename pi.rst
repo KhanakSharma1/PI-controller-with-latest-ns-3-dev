@@ -49,13 +49,22 @@ The key attributes that the PiQueue class holds include the following:
 Examples
 ========
 
-The example for PI is `pi-vs-pie.cc` located in ``src/traffic-control/examples``. To run the file (the first invocation below shows the available command-line options):
+The example for PI is `pi-vs-pie.cc` located in ``src/traffic-control/examples``. (The first invocation below shows the available command-line options):
+
+
+To run and test PI :
 
 :: 
 
    $ ./waf --run "pi-vs-pie --PrintHelp"
    $ ./waf --run "pi-vs-pie --queueDiscType=PI"
    
+To run and test PIE :
+
+:: 
+
+   $ ./waf --run "pi-vs-pie --queueDiscType=PIE"
+
 Validation
 **********
 
