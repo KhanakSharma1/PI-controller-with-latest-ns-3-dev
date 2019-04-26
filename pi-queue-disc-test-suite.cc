@@ -106,7 +106,7 @@ PiQueueDiscTestCase::RunPiTest (QueueSizeUnit mode)
 
   if (mode == QueueSizeUnit::BYTES)
     {
-      pktSize = 600;
+      pktSize = 500;
       modeSize = pktSize;
       queue->SetMaxSize (QueueSize (mode, qSize * modeSize));
     }
@@ -183,7 +183,6 @@ PiQueueDiscTestCase::RunPiTest (QueueSizeUnit mode)
   EnqueueWithDelay (queue, pktSize, 300);
   Simulator::Stop (Seconds (40));
   Simulator::Run ();
-  //PiQueueDisc::Stats st = StaticCast<PiQueueDisc> (queue)->GetStats ();
   QueueDisc::Stats st = queue->GetStats ();
   drop.test2 = st.GetNDroppedPackets (PiQueueDisc::UNFORCED_DROP);
   NS_TEST_EXPECT_MSG_NE (drop.test2, 0, "There should be some unforced drops");
