@@ -104,35 +104,6 @@ PiQueueDisc::DoDispose (void)
   QueueDisc::DoDispose ();
 }
 
-/*void
-PiQueueDisc::SetMode (QueueSizeUnit mode)
-{
-  NS_LOG_FUNCTION (this << mode);
-  m_mode = mode;
-}
-
-QueueSizeUnit
-PiQueueDisc::GetMode (void)
-{
-  NS_LOG_FUNCTION (this);
-  return m_mode;
-}
-
-void
-PiQueueDisc::SetQueueLimit (double lim)
-{
-  NS_LOG_FUNCTION (this << lim);
-  m_queueLimit = lim;
-}*/
-
-
-
-/*PiQueueDisc::Stats
-PiQueueDisc::GetStats ()
-{
-  NS_LOG_FUNCTION (this);
-  return m_stats;
-}*/
 
 int64_t
 PiQueueDisc::AssignStreams (int64_t stream)
