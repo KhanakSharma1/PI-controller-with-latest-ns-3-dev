@@ -193,7 +193,7 @@ int main (int argc, char *argv[])
 
     if (printPiStats)
      {
-       std::cout << "*** PI stats from Node 2 queue ***" << std::endl;
+       std::cout << "\n*** PI stats from Node 2 queue ***" << std::endl;
        std::cout << "\t " << st.GetNDroppedPackets (PiQueueDisc::UNFORCED_DROP)
                  << " drops due to prob mark" << std::endl;
        std::cout << "\t " << st.GetNDroppedPackets (PiQueueDisc::FORCED_DROP)
@@ -212,7 +212,7 @@ int main (int argc, char *argv[])
 
     if (printPieStats)
      {
-       std::cout << "*** PIE stats from Node 2 queue ***" << std::endl;
+       std::cout << "\n*** PIE stats from Node 2 queue ***" << std::endl;
        std::cout << "\t " << st.GetNDroppedPackets (PieQueueDisc::UNFORCED_DROP)
                  << " drops due to prob mark" << std::endl;
        std::cout << "\t " << st.GetNDroppedPackets (PieQueueDisc::FORCED_DROP)
@@ -221,7 +221,7 @@ int main (int argc, char *argv[])
 
  }  
   
-  std::cout << "*** Stats from the bottleneck queue disc ***" << std::endl;
+  std::cout << "\n\n*** Stats from the bottleneck queue disc ***" << std::endl;
   std::cout << st << std::endl;
   std::cout << "Destroying the simulation" << std::endl;
 
